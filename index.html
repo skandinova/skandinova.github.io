@@ -1,60 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
         <title>Jacob Seamus Olson</title>
         <style>
-          html, body, #viewDiv {
-            padding: 0;
-            margin: 0;
-            height: 100%;
-            width: 100%;
-          }
+            html, body, #viewDiv {
+              padding: 0;
+              margin: 0;
+              height: 100%;
+              width: 100%;
+            }
         </style>
         <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
         <script src="https://js.arcgis.com/4.30/"></script>
-      
+
         <script>
-          require([
-            "esri/config",
-            "esri/Map",
-            "esri/WebMap",
-            "esri/views/MapView",
-            "esri/widgets/ScaleBar",
-            "esri/widgets/Legend"
-          ], function(esriConfig, WebMap, MapView, ScaleBar, Legend) {
-      
-            esriConfig.apiKey = "AAPT3NKHt6i2urmWtqOuugvr9ePRDSV0C2rNlYeFF_nTFSHO78OAGLyNKIs0e2hvrUXimn-K5JlTG7IvLM9nGYg6l15k4IUCv-Yc8zvkbrqYIODwd07auuQt6jsjANR5zs2wNWs5gcVZ-3993FTIxuAgFPezcnRplogFFSysOOc2wMWgPfOJgFw7Hz_PezBXEKvCvA96yPUmgmizzHSBkbeKFttUTrNpZnC4II1ceK63IJSjOZXZ-_8xIY3dKDtvEU1n";
-      
-            const webmap = new WebMap({
-              portalItem: {
-                id: "b7dbfc506ccc4bb58fc9049f9ccf4d01"
-              }
+            require(["esri/config", "esri/Map", "esri/WebMap", "esri/views/MapView", "esri/widgets/Legend"], function(esriConfig, WebMap, MapView, Legend) {
+                esriConfig.apiKey = "AAPT3NKHt6i2urmWtqOuugvr9ePRDSV0C2rNlYeFF_nTFSFOIPvZU1YcpMTCYqsoNXBfrikLPxZjCL4qMg8Vc_Gk64fj4Js9fAiVZjZaejazK3Q40SRQ6TLcvFNhm9xJL_SFLf7Lh5DWKQ8KA9J9DJ4iHxGXtHoB89ffV09SMDhymK9TLj7iQ2s5K2NT2BEJR2SrpX33m5WA-yvq3Hj-xUOVASd-mIq8mZDX2bXKD0ouJjmGmjtVQaCFg8WxPYtX6ZhR";
+
+                const webmap = new WebMap({
+                    portalItem: {
+                    id: "b7dbfc506ccc4bb58fc9049f9ccf4d01"
+                    }
+                });
+
+                const view = new MapView({
+                    container: "viewDiv",
+
+                    map: map,
+
+                    map: webmap
+
+                });
+
+                const legend = new Legend ({
+                    view: view
+                });
+                view.ui.add(legend, "top-right");
             });
-      
-            const view = new MapView({
-              container: "viewDiv",
-      
-              map: webmap
-      
-            });
-      
-            const scalebar = new ScaleBar({
-              view: view
-            });
-      
-            view.ui.add(scalebar, "bottom-left");
-      
-            const legend = new Legend ({
-              view: view
-            });
-            view.ui.add(legend, "top-right");
-      
-        });
         </script>
-      </head>
-      <body>
-        <div id="viewDiv"></div>
-      </body>
+    </head>
+    <body>
+        <header>
+            <h1>Jacob Seamus Olson</h1>
+            <p>GIS Analyst</p>
+        </header>
+
+        <main>
+            <div id="viewDiv"></div>
+        </main>
+    </body>
 </html>
