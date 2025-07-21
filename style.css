@@ -60,7 +60,37 @@
   }
   
   .nav-links li a:hover {
-	text-decoration: underline;
+	color: #a1a1a1;
+  }
+
+  .menu-toggle {
+	display: none;
+	font-size: 1.5rem;
+	background: none;
+	border: none;
+	color: white;
+	cursor: pointer;
+  }
+  
+  @media (max-width: 768px) {
+	.menu-toggle {
+	  display: block;
+	}
+  
+	.nav-links {
+	  display: none;
+	  flex-direction: column;
+	  background-color: #333;
+	  position: absolute;
+	  top: 4rem;
+	  right: 0;
+	  width: 100%;
+	  padding: 1rem;
+	}
+  
+	.nav-links.show {
+	  display: flex;
+	}
   }
   
   .site-title {

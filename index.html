@@ -12,6 +12,7 @@
   <!-- Navigation -->
   <nav>
     <div class="nav-container">
+      <button class="menu-toggle" aria-label="Toggle navigation">&#9776;</button>
       <ul class="nav-links">
         <li><a href="index.html">Home</a></li>
         <li><a href="portfolio.html">Portfolio</a></li>
@@ -59,5 +60,13 @@
     </section>
   </div>
 
+  <script>
+    const toggle = document.querySelector('.menu-toggle');
+    const links = document.querySelector('.nav-links');
+  
+    toggle.addEventListener('click', () => {
+      links.classList.toggle('show');
+    });
+  </script>  
 </body>
 </html>
