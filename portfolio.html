@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Jacob Seamus Olson</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"></script>
+
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-container">
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="portfolio.html">Portfolio</a></li>
+        <li><a href="map.html">Travel Map</a></li>
+      </ul>
+      <span class="site-title">Jacob Seamus Olson</span>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <div class="container">
+    <h2>Portfolio</h2>
+
+    <div class="portfolio-grid">
+      <div class="portfolio-item">
+        <div class="description">
+          <strong>Experience Builder: Travel Map</strong><br>
+          Simple Experience Builder app where I upload pictures from my trips with the locations shown on a map. I started by using the Geotagged Photos to Points tool in ArcGIS Pro to create a point feature class from photos taken on my iPhone over the years and uploading the feature class to ArcGIS Online. I add new photos by using the Field Maps mobile app. The popups include an Arcade expression to convert coordinates to DMS format. The app can be viewed by clicking "Travel Map" in the menu above.
+        </div>
+        <img src="images/travel-map.PNG" alt="Screenshot of Travel Map">
+      </div>
+
+      <div class="portfolio-item">
+        <div class="description">
+          <strong>Python: Convert PLS-CADD LiDAR Points to Contour Lines</strong><br>
+          This is the source code for an ArcGIS Pro script tool which takes a LiDAR shapefile exported from PLS-CADD and creates contour lines with it. I created this script tool to speed up a task that I previously had to do manually while working at a previous company.
+        </div>
+        <pre><code class="language-python">import arcpy
+import os
+
+def lidar_process(in_lidar, final_out):
+    # Place lidar points in correct geographic coordinates with XY table to point
+    xy_result = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data.gdb\xy_result"
+    arcpy.management.XYTableToPoint(in_table=in_lidar, out_feature_class=xy_result, x_field="longitude", y_field="latitude")
+
+    # Project lidar points to correct state plane projection
+    proj_result = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data.gdb\proj_result"
+    sr = sp_project(in_points=xy_result, out_proj=proj_result)
+    arcpy.management.Delete(xy_result)
+
+    # Create a TIN with projected lidar
+    tin_result = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data\tin_result"
+    arcpy.ddd.CreateTin(out_tin=tin_result, spatial_reference=sr, in_features=f"{proj_result} Z")
+    arcpy.management.Delete(proj_result)
+
+    # Get point spacing to delineate TIN and remove outside areas
+    max_edge = get_ps(in_lidar) * 4
+    arcpy.ddd.DelineateTinDataArea(in_tin=tin_result, max_edge_length=max_edge)
+
+    # Create raster from TIN
+    ras_result = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data.gdb\ras_result"
+    arcpy.ddd.TinRaster(in_tin=tin_result, out_raster=ras_result, sample_distance="CELLSIZE", sample_value=1)
+    arcpy.management.Delete(tin_result)
+
+    # Create contour lines from raster
+    con_result = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data.gdb\con_result"
+    arcpy.sa.Contour(in_raster=ras_result, out_polyline_features=con_result, contour_interval=10)
+    arcpy.management.Delete(ras_result)
+
+    # Smooth final contour lines
+    arcpy.cartography.SmoothLine(in_features=con_result, out_feature_class=final_out, algorithm="PAEK", tolerance=10)
+    arcpy.management.Delete(con_result)
+
+    return
+
+def sp_project(in_points, out_proj):
+    state_plane = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data.gdb\CA_State_Plane_Zones"
+
+    # Perform summarize within tool to find number of lidar points in each state plane
+    sum_within = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data.gdb\sum_within"
+    arcpy.analysis.SummarizeWithin(in_polygons=state_plane, in_sum_features=in_points, out_feature_class=sum_within)
+
+    # Get state plane zone with highest number of lidar points
+    fields = ['ZONE', 'Point_Count']
+    allvalues = [row for row in arcpy.da.SearchCursor(sum_within, fields)]
+    proj_zone = max(allvalues, key=lambda x: x[1])[0]
+    arcpy.management.Delete(sum_within)
+
+    # Dictionary for returning full state plane projection name
+    coor_sys = {
+        "CA_1": "NAD 1983 StatePlane California I FIPS 0401 (US Feet)",
+        "CA_2": "NAD 1983 StatePlane California II FIPS 0402 (US Feet)",
+        "CA_3": "NAD 1983 StatePlane California III FIPS 0403 (US Feet)",
+        "CA_4": "NAD 1983 StatePlane California IV FIPS 0404 (US Feet)",
+        "CA_5": "NAD 1983 StatePlane California V FIPS 0405 (US Feet)",
+        "CA_6": "NAD 1983 StatePlane California VI FIPS 0406 (US Feet)"
+    }
+
+    # Project lidar points to state plane zone with most points within it
+    out_coor_sys = arcpy.SpatialReference(coor_sys[proj_zone])
+    arcpy.management.Project(in_dataset=in_points, out_dataset=out_proj, out_coor_system=out_coor_sys)
+    return out_coor_sys
+
+def get_ps(lidar_points):
+    # Run LAStools shp2las in OS system
+    las_result = r"C:\GitHub\arcpy-scripts\LidarToTopo\temp_data\las_result.las"
+    las_com = fr"C:\GitHub\arcpy-scripts\LidarToTopo\LAStools\bin\shp2las.exe -i {lidar_points} -o {las_result}"
+    os.system(las_com)
+
+    # Run LAS dataset statistics to return point spacing
+    arcpy.management.LasDatasetStatistics(las_result)
+    ps = arcpy.Describe(las_result).pointSpacing
+    arcpy.management.Delete(las_result)
+
+    return ps
+
+if __name__ == "__main__":
+    in_lidar = arcpy.GetParameterAsText(0)
+    final_out = arcpy.GetParameterAsText(1)
+
+    lidar_process(in_lidar, final_out)
+</code></pre>
+      </div>
+
+      <!-- Project 3: Both image and code -->
+      <div class="portfolio-item">
+        <div class="description">
+          <strong>Leaflet Map Example</strong><br>
+          A simple interactive web map created using Leaflet.js.
+        </div>
+        <img src="images/leaflet-map.jpg" alt="Leaflet Map Screenshot">
+        <pre><code class="language-javascript">&lt;div id="map"&gt;&lt;/div&gt;
+
+&lt;script&gt;
+  var map = L.map('map').setView([51.505, -0.09], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+&lt;/script&gt;
+</code></pre>
+      </div>
+
+      <!-- Project 4: Code only -->
+      <div class="portfolio-item">
+        <div class="description">
+          <strong>HTML Table from GeoJSON</strong><br>
+          Render a simple HTML table from GeoJSON features.
+        </div>
+        <pre><code>&lt;script&gt;
+const data = {
+  "type": "FeatureCollection",
+  "features": [
+    { "properties": { "name": "Park", "type": "Recreation" }},
+    { "properties": { "name": "Library", "type": "Education" }}
+  ]
+};
+
+let table = "&lt;table&gt;&lt;tr&gt;&lt;th&gt;Name&lt;/th&gt;&lt;th&gt;Type&lt;/th&gt;&lt;/tr&gt;";
+data.features.forEach(f =&gt; {
+  table += `&lt;tr&gt;&lt;td&gt;${f.properties.name}&lt;/td&gt;&lt;td&gt;${f.properties.type}&lt;/td&gt;&lt;/tr&gt;`;
+});
+table += "&lt;/table&gt;";
+document.getElementById("output").innerHTML = table;
+&lt;/script&gt;
+</code></pre>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
