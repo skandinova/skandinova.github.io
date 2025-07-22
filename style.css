@@ -45,13 +45,11 @@
 	flex-wrap: wrap;
   }
   
-  /* Site title on the right */
   .site-title {
 	font-size: 1.2rem;
 	font-weight: bold;
   }
   
-  /* NAV LINKS */
   .nav-links {
 	list-style: none;
 	display: flex;

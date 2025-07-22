@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Jacob Seamus Olson</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Roboto:wght@400;500&family=Uncial+Antiqua&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
@@ -56,7 +56,7 @@
       <div class="portfolio-item">
         <div class="description">
           <strong>Python: Convert PLS-CADD LiDAR Points to Contour Lines</strong><br>
-          This is the source code for an ArcGIS Pro script tool which takes a LiDAR shapefile exported from PLS-CADD and creates contour lines with it. I created this script tool to speed up a task that I previously had to do manually while working at a previous company.
+          This is the source code for an ArcGIS Pro script tool which takes a LiDAR shapefile exported from PLS-CADD and creates contour lines with it. I created this script tool to speed up a task that I previously had to do manually while working at a previous company. Because PLS-CADD exports LiDAR as shapefiles rather than LAS files, I used LAS tools in a system command prompt to convert to LAS to get the point spacing, allowing me to delineate the TIN, preventing me from having to clip the final contour manually.
         </div>
         <pre><code class="language-python">import arcpy
 import os
@@ -147,13 +147,132 @@ if __name__ == "__main__":
 
       <div class="portfolio-item">
         <div class="description">
-          <strong>Wildfire Risk Analysis placeholder</strong><br>
-          Inserting info soon.
+          <strong>Experience Builder: Environmental Data Viewer</strong><br>
+          Experience Builder app built for non GIS employees to easily view environmental GIS data on a map, as well as import their own KML data. Building this app with ArcGIS Enterprise allowed for all company employees to view the app without needing ArcGIS credentials thanks to single sign on. Employees previously viewed environmental data as KML files in Google Earth, which was significantly slower.
         </div>
-        <img src="images/leaflet-map.jpg" alt="Leaflet Map Screenshot">
-        <pre><code class="language-python"># Insert
-# Code
-# Here
+        <img src="images/env-viewer.png" alt="Screenshot of Environmental Viewer App">
+      </div>
+
+      <div class="portfolio-item">
+        <div class="description">
+          <strong>Python: Wildfire Risk Analysis Script Tool</strong><br>
+          This is the source code for an ArcGIS Pro script tool made to automate the process of analyzing wildfire risk in a user-defined area. The user then inputs a number of layers to be used as risk factors, meaning areas within certain distances of these features will have higher levels of risk, and weights for these layers, which multiply their overall risk. The tool then adds those risks with land use and elevation data to calculate a final risk score raster of the area. This tool is meant to be portable, so it doesn't reference local file paths, instead using land use and elevation data from the Living Atlas.
+        </div>
+        <pre><code class="language-python">import arcpy
+
+def main_process(cdp, gdb, ocs, rff, wgt, srr, final_out):
+    # Set user specified workspace and output coordinate system
+    arcpy.AddMessage("Setting up environment...")
+    arcpy.env.workspace = gdb
+    arcpy.env.outputCoordinateSystem = ocs
+    
+    # Create study area with buffer of user inputted community boundaries
+    study_area = "study_area"
+    arcpy.analysis.Buffer(in_features=cdp, out_feature_class=study_area, buffer_distance_or_field="0.5 Miles", dissolve_option="ALL")
+    arcpy.env.extent = study_area
+    arcpy.env.mask = study_area
+
+    # Bring in elevation service and set it as the snap raster
+    try:
+        arcpy.management.MakeImageServerLayer(in_image_service="https://elevation.arcgis.com/arcgis/rest/services/NED30m/ImageServer", out_imageserver_layer="dem", cell_size=30.0)
+    except Exception:
+        arcpy.AddError("Could not connect to ArcGIS Online. Make sure you're connected to the internet.")
+        arcpy.management.Delete(study_area)
+        return
+
+    arcpy.env.snapRaster = "dem"
+
+    # Create list of risk score rasters based on user defined risk factor feature classes
+    risk_rast = []
+
+    for fc in rff:
+        fl = arcpy.management.MakeFeatureLayer(in_features=fc, out_layer="fl")
+        fc_name = arcpy.Describe(fl).name
+        arcpy.AddMessage(f"Analyzing risk for {fc_name}...")
+        temp_name = f"eucdist_{fc_name}"
+        out_euc_dist = arcpy.sa.EucDistance(in_source_data=fl, cell_size="30")
+        out_euc_dist.save(temp_name)
+        rmp_rng = arcpy.sa.RemapRange([[0, 250, 3], [250.01, 500, 2], [500.01, 1000, 1], [1000.01, arcpy.Raster(temp_name).maximum, 0]])
+        final_name = arcpy.sa.Reclassify(in_raster=temp_name, reclass_field="Value", remap=rmp_rng)
+        final_name.save(f"{fc_name}_Risk")
+        risk_rast.append(final_name)
+        arcpy.management.Delete(temp_name)
+
+    # Create land cover risk score raster
+    arcpy.AddMessage("Analyzing risk for land cover...")
+    try:
+        arcpy.management.MakeImageServerLayer(in_image_service="https://landscape10.arcgis.com/arcgis/rest/services/USA_NLCD_Land_Cover/ImageServer", out_imageserver_layer="nlcd")
+        rmp_val = arcpy.sa.RemapValue([[11, 0], [12, 0], [21, 1], [22, 1], [23, 1], [24, 0], [31, 0], [41, 3], [42, 5], [43, 4], [52, 4], [71, 3], [81, 3], [82, 1], [90, 1], [95, 1]])
+        nlcd_risk = arcpy.sa.Reclassify(in_raster="nlcd", reclass_field="Value", remap=rmp_val)
+        nlcd_risk.save("NLCD_Risk")
+        risk_rast.append(nlcd_risk)
+    except Exception:
+        arcpy.AddWarning("Final calculation does not include land cover due to an unexpected error. Check to make sure your internet connection is stable.")
+
+    # Create slope risk score raster
+    arcpy.AddMessage("Analyzing risk for slope...")
+    try:
+        arcpy.management.MakeImageServerLayer(in_image_service="https://elevation.arcgis.com/arcgis/rest/services/NED30m/ImageServer", out_imageserver_layer="slope", cell_size=30.0, processing_template="Slope_Percent")
+        slope_rmp_rng = arcpy.sa.RemapRange([[0, 10, 0], [10, 30, 1], [30, 50, 2], [50, 70, 3], [70, 1000, 4]])
+        slope_risk = arcpy.sa.Reclassify(in_raster="slope", reclass_field="Value", remap=slope_rmp_rng)
+        slope_risk.save("Slope_Risk")
+        risk_rast.append(slope_risk)
+    except Exception:
+        arcpy.AddWarning("Final calculation does not include slope due to an unexpected error. Check to make sure your internet connection is stable.")
+
+    # Create aspect risk score raster
+    arcpy.AddMessage("Analyzing risk for aspect...")
+    try:
+        arcpy.management.MakeImageServerLayer(in_image_service="https://elevation.arcgis.com/arcgis/rest/services/NED30m/ImageServer", out_imageserver_layer="aspect", cell_size=30.0, processing_template="Aspect")
+        aspect_rmp_rng = arcpy.sa.RemapRange([[-1, 45, 0], [45, 135, 1], [135, 225, 3], [225, 315, 2], [315, 360, 0]])
+        aspect_risk = arcpy.sa.Reclassify(in_raster="aspect", reclass_field="Value", remap=aspect_rmp_rng)
+        aspect_risk.save("Aspect_Risk")
+        risk_rast.append(aspect_risk)
+    except Exception:
+        arcpy.AddWarning("Final calculation does not include aspect due to an unexpected error. Check to make sure your internet connection is stable.")
+
+    # Add risk values to create final risk score raster
+    arcpy.AddMessage("Calculating overall risk...")
+    in_names = []
+    expression = ""
+
+    for i in range(len(risk_rast)):
+        in_name = f"rast{i}"
+        in_names.append(in_name)
+
+        if i > 0:
+            expression += "+"
+
+        expression += in_name
+
+        if i < len(wgt):
+            expression += f"*{wgt[i]}"
+
+    final_raster = arcpy.sa.RasterCalculator(rasters=risk_rast, input_names=in_names, expression=expression)
+    final_raster.save(final_out)
+
+    # Reset environment
+    arcpy.ResetEnvironments()
+
+    # Delete individual risk rasters if user doesn't specify to save them
+    if srr == False:
+        arcpy.AddMessage("Removing individual risk rasters...")
+        arcpy.management.Delete(risk_rast)
+
+    arcpy.AddMessage("Process complete.")
+
+if __name__ == "__main__":
+    in_cdp = arcpy.GetParameterAsText(0)
+    in_gdb = arcpy.GetParameterAsText(1)
+    in_ocs = arcpy.GetParameterAsText(2)
+    table = arcpy.ValueTable(2)
+    table.loadFromString(arcpy.GetParameterAsText(3))
+    in_rff = [table.getValue(i, 0) for i in range(0, table.rowCount)]
+    in_wgt = [float(table.getValue(i, 1)) for i in range(0, table.rowCount)]
+    in_srr = bool(arcpy.GetParameterAsText(4))
+    final_out = arcpy.GetParameterAsText(5)
+
+    main_process(in_cdp, in_gdb, in_ocs, in_rff, in_wgt, in_srr, final_out)
 </code></pre>
       </div>
 
