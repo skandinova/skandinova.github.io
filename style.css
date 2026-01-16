@@ -189,9 +189,3 @@
 	left: 0;
 	right: 0;
   }
-  
-  arcgis-map {
-	width: 100%;
-	height: 100%;
-	display: block;
-  }
